@@ -1,3 +1,5 @@
+import type { TestSubject } from '../test-subject';
+
 export type Installer = (pkg: InstallablePackage) => Promise<InstalledAppInfo>;
 
 export type Package = {
@@ -8,12 +10,12 @@ export type Package = {
   installer: Installer;
 };
 
-export type InstallablePackage = {
-  appName: string;
-  filepath: string;
+export type InstallablePackage = TestSubject & {
+  sandboxPath: string;
 };
 
 export type InstalledAppInfo = {
   appPath: string;
-  uninstall: () => Promise<void>;
+  appName: string;
+  uninstall: () => void | Promise<void>;
 };
