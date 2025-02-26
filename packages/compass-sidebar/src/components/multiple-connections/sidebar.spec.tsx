@@ -5,7 +5,6 @@ import type { RenderWithConnectionsHookResult } from '@mongodb-js/testing-librar
 import {
   createPluginTestHelpers,
   screen,
-  cleanup,
   waitFor,
   within,
   userEvent,
@@ -17,7 +16,10 @@ import type { WorkspacesService } from '@mongodb-js/compass-workspaces/provider'
 import { WorkspacesServiceProvider } from '@mongodb-js/compass-workspaces/provider';
 import { TestMongoDBInstanceManager } from '@mongodb-js/compass-app-stores/provider';
 import { ConnectionImportExportProvider } from '@mongodb-js/compass-connection-import-export';
-import { CompassSidebarPlugin } from '../../index';
+import {
+  AtlasClusterConnectionsOnlyProvider,
+  CompassSidebarPlugin,
+} from '../../index';
 import type { ConnectionInfo } from '@mongodb-js/compass-connections/provider';
 import type AppRegistry from '../../../../hadron-app-registry/dist';
 
@@ -91,14 +93,16 @@ describe('Multiple Connections Sidebar Component', function () {
 
   function doRender(
     activeWorkspace: WorkspaceTab | null = null,
-    connections: ConnectionInfo[] = [savedFavoriteConnection]
+    connections: ConnectionInfo[] | 'no-preload' = [savedFavoriteConnection],
+    atlasClusterConnectionsOnly: boolean | undefined = undefined
   ) {
     workspace = sinon.spy({
       openMyQueriesWorkspace: () => undefined,
       openShellWorkspace: () => undefined,
       openPerformanceWorkspace: () => undefined,
     }) as any;
-    const result = renderWithConnections(
+
+    let component = (
       <ConnectionImportExportProvider>
         <WorkspacesProvider
           value={[
@@ -112,25 +116,35 @@ describe('Multiple Connections Sidebar Component', function () {
             ></MultipleConnectionSidebar>
           </WorkspacesServiceProvider>
         </WorkspacesProvider>
-      </ConnectionImportExportProvider>,
-      {
-        preferences: { enableMultipleConnectionSystem: true },
-        connections,
-        connectFn() {
-          return {
-            currentOp() {
-              return {};
-            },
-            top() {
-              return {};
-            },
-            getConnectionOptions() {
-              return {};
-            },
-          } as any;
-        },
-      }
+      </ConnectionImportExportProvider>
     );
+
+    if (atlasClusterConnectionsOnly !== undefined) {
+      component = (
+        <AtlasClusterConnectionsOnlyProvider
+          value={atlasClusterConnectionsOnly}
+        >
+          {component}
+        </AtlasClusterConnectionsOnlyProvider>
+      );
+    }
+
+    const result = renderWithConnections(component, {
+      connections,
+      connectFn() {
+        return {
+          currentOp() {
+            return {};
+          },
+          top() {
+            return {};
+          },
+          getConnectionOptions() {
+            return {};
+          },
+        } as any;
+      },
+    });
     track = result.track;
     appRegistry = sinon.spy(result.globalAppRegistry);
     connectionsStoreActions = sinon.spy(result.connectionsStore.actions);
@@ -138,7 +152,6 @@ describe('Multiple Connections Sidebar Component', function () {
   }
 
   afterEach(function () {
-    cleanup();
     sinon.restore();
   });
 
@@ -188,7 +201,50 @@ describe('Multiple Connections Sidebar Component', function () {
     });
   });
 
+  describe("'Connections ' header", function () {
+    context('by default', () => {
+      it("shows 'Connections' in header and search bar", () => {
+        doRender(undefined, [savedFavoriteConnection, savedRecentConnection]);
+        expect(screen.getByTestId('connections-header').textContent).to.equal(
+          'Connections(2)'
+        );
+        expect(
+          screen.getByTestId<HTMLInputElement>('sidebar-filter-input')
+            .placeholder
+        ).to.equal('Search connections');
+      });
+    });
+    context('when is atlas clusters only', () => {
+      it("shows 'Clusters' in header and search bar", () => {
+        doRender(
+          undefined,
+          [savedFavoriteConnection, savedRecentConnection],
+          true
+        );
+        expect(screen.getByTestId('connections-header').textContent).to.equal(
+          'Clusters(2)'
+        );
+        expect(
+          screen.getByTestId<HTMLInputElement>('sidebar-filter-input')
+            .placeholder
+        ).to.equal('Search clusters');
+      });
+    });
+  });
+
   describe('connections list', function () {
+    it('should display a loading state while connections are not loaded yet', function () {
+      doRender(null, 'no-preload');
+      expect(screen.getByTestId('connections-placeholder')).to.be.visible;
+      expect(screen.getByRole('searchbox', { name: 'Search' })).to.have.attr(
+        'aria-disabled',
+        'true'
+      );
+      expect(
+        screen.getByRole('button', { name: 'Filter connections' })
+      ).to.have.attr('aria-disabled', 'true');
+    });
+
     context('when there are no connections', function () {
       it('should display an empty state with a CTA to add new connection', function () {
         doRender(undefined, []);

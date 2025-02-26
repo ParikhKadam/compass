@@ -1,7 +1,13 @@
 
 # Compass Tracking Plan
 
-Generated on Tue, Jan 14, 2025 at 03:51 PM
+> [!NOTE]
+> This plan represents the tracking plan for the current branch / commit that 
+> you have selected (`main` by default), it might not be released yet. To find
+> the tracking plan for the specific Compass version you can use the following
+> URL: `https://github.com/mongodb-js/compass/blob/<compass version>/docs/tracking-plan.md`
+
+Generated on Wed, Feb 26, 2025
 
 ## Table of Contents
 
@@ -147,6 +153,7 @@ Generated on Tue, Jan 14, 2025 at 03:51 PM
 - [Signal Shown](#event--SignalShownEvent)
 
 ### Schema
+- [Schema Analysis Cancelled](#event--SchemaAnalysisCancelledEvent)
 - [Schema Analyzed](#event--SchemaAnalyzedEvent)
 - [Schema Exported](#event--SchemaExportedEvent)
 
@@ -888,7 +895,9 @@ This event is fired when user successfully connects to a new server/cluster.
 - **topology_type** (required): `string`
   - The type of connected topology.
 - **num_active_connections** (required): `number`
-  - The number of active connections.
+  - The number of saved active connections (doesn't include new connections
+that are not yet fully saved, like the ones created with the "New
+Connection" button)
 - **num_inactive_connections** (required): `number`
   - The number of inactive connections.
 - **auth_type** (optional): `string | undefined`
@@ -936,8 +945,6 @@ This event is fired when a collection is created.
 
 **Properties**:
 
-- **is_capped** (required): `boolean`
-  - Indicates whether the collection is capped.
 - **has_collation** (required): `boolean`
   - Indicates whether the collection has a custom collation.
 - **is_timeseries** (required): `boolean`
@@ -960,8 +967,6 @@ This event is fired when a database is created.
 
 **Properties**:
 
-- **is_capped** (required): `boolean`
-  - Indicates whether the first collection in the database is capped.
 - **has_collation** (required): `boolean`
   - Indicates whether the first collection in the database has a custom collation.
 - **is_timeseries** (required): `boolean`
@@ -1865,6 +1870,22 @@ This event is fired when signal icon badge is rendered on the screen visible to 
 
 ## Schema
 
+<a name="event--SchemaAnalysisCancelledEvent"></a>
+
+### Schema Analysis Cancelled
+
+This event is fired when user analyzes the schema.
+
+**Properties**:
+
+- **with_filter** (required): `boolean`
+  - Indicates whether a filter was applied during the schema analysis.
+- **analysis_time_ms** (required): `number`
+  - The time taken when analyzing the schema, before being cancelled, in milliseconds.
+- **is_compass_web** (optional): `true | undefined`
+- **connection_id** (optional): `string | undefined`
+  - The id of the connection associated to this event.
+
 <a name="event--SchemaAnalyzedEvent"></a>
 
 ### Schema Analyzed
@@ -1877,6 +1898,14 @@ This event is fired when user analyzes the schema.
   - Indicates whether a filter was applied during the schema analysis.
 - **schema_width** (required): `number`
   - The number of fields at the top level.
+- **field_types** (required): `{ [x: string]: number; }`
+  - Key/value pairs of bsonType and count.
+- **variable_type_count** (required): `number`
+  - The count of fields with multiple types in a given schema (not counting undefined).
+This is only calculated for the top level fields, not nested fields and arrays.
+- **optional_field_count** (required): `number`
+  - The count of fields that don't appear on all documents.
+This is only calculated for the top level fields, not nested fields and arrays.
 - **schema_depth** (required): `number`
   - The number of nested levels.
 - **geo_data** (required): `boolean`
@@ -1897,6 +1926,8 @@ This event is fired when user shares the schema.
 
 - **has_schema** (required): `boolean`
   - Indicates whether the schema was analyzed before sharing.
+- **format** (required): `"standardJSON" | "mongoDBJSON" | "extendedJSON" | "legacyJSON"`
+- **source** (required): `"app_menu" | "schema_tab"`
 - **schema_width** (required): `number`
   - The number of fields at the top level.
 - **schema_depth** (required): `number`

@@ -33,7 +33,7 @@ buildvariants:
         run_on: macos-14-arm64-gui
   - name: package-ubuntu
     expansions:
-      silk_asset_group: compass-ubuntu
+      target_platform: ubuntu
     display_name: Package Ubuntu
     run_on: ubuntu1804-large
     tasks:
@@ -42,7 +42,7 @@ buildvariants:
       - name: package-compass-readonly
   - name: package-windows
     expansions:
-      silk_asset_group: compass-windows
+      target_platform: windows
     display_name: Package Windows
     run_on: windows-vsCurrent-large
     tasks:
@@ -51,7 +51,7 @@ buildvariants:
       - name: package-compass-readonly
   - name: package-rhel
     expansions:
-      silk_asset_group: compass-rhel
+      target_platform: rhel
     display_name: Package RHEL
     run_on: rhel80-large
     tasks:
@@ -60,7 +60,7 @@ buildvariants:
       - name: package-compass-readonly
   - name: package-macos-x64
     expansions:
-      silk_asset_group: compass-macos
+      target_platform: macos
     display_name: Package MacOS Intel
     run_on: macos-14
     tasks:
@@ -69,29 +69,49 @@ buildvariants:
       - name: package-compass-readonly
   - name: package-macos-arm
     expansions:
-      silk_asset_group: compass-macos-arm
+      target_platform: macos-arm
     display_name: Package MacOS Arm64
     run_on: macos-14-arm64
     tasks:
       - name: package-compass
       - name: package-compass-isolated
       - name: package-compass-readonly
-  - name: smoketest-macos-x64-compass
-    display_name: Smoketest MacOS Intel (compass)
-    run_on: macos-14-gui
+  - name: smoketest-packaged-app
+    display_name: Smoke Test via GitHub Actions
+    run_on: ubuntu2004-large
     depends_on:
+      - name: package-compass
+        variant: package-ubuntu
+      - name: package-compass
+        variant: package-windows
+      - name: package-compass
+        variant: package-rhel
       - name: package-compass
         variant: package-macos-x64
-    tasks:
-      - name: smoketest-compass
-  - name: smoketest-macos-arm-compass
-    display_name: Smoketest MacOS Arm64 (compass)
-    run_on: macos-14-arm64-gui
-    depends_on:
       - name: package-compass
         variant: package-macos-arm
+      - name: package-compass-isolated
+        variant: package-ubuntu
+      - name: package-compass-isolated
+        variant: package-windows
+      - name: package-compass-isolated
+        variant: package-rhel
+      - name: package-compass-isolated
+        variant: package-macos-x64
+      - name: package-compass-isolated
+        variant: package-macos-arm
+      - name: package-compass-readonly
+        variant: package-ubuntu
+      - name: package-compass-readonly
+        variant: package-windows
+      - name: package-compass-readonly
+        variant: package-rhel
+      - name: package-compass-readonly
+        variant: package-macos-x64
+      - name: package-compass-readonly
+        variant: package-macos-arm
     tasks:
-      - name: smoketest-compass
+      - name: smoketest-packaged-app
   - name: test-eol-servers
     display_name: Test EoL Servers
     run_on: ubuntu1804-large
@@ -243,7 +263,6 @@ buildvariants:
     run_on: ubuntu2004-large
     tasks:
       - name: publish
-      - name: publish-packages-next
       - name: publish-dev-release-info
       - name: create_static_analysis_report
   - name: connectivity-tests
@@ -306,6 +325,7 @@ tasks:
       - func: test
         vars:
           debug: hadron*,mongo*
+          mongodb_version: 8.0.x-enterprise
   - name: test-electron
     tags:
       - required-for-publish
@@ -317,6 +337,7 @@ tasks:
       - func: test-electron
         vars:
           debug: hadron*,mongo*
+          mongodb_version: 8.0.x-enterprise
   - name: test-connectivity
     tags:
       - required-for-publish
@@ -326,6 +347,7 @@ tasks:
       - func: test-connectivity
         vars:
           debug: compass*,electron*,hadron*,mongo*
+          mongodb_version: 8.0.x-enterprise
   - name: test-csfle
     tags:
       - required-for-publish
@@ -337,6 +359,7 @@ tasks:
       - func: test-csfle
         vars:
           debug: compass*,electron*,hadron*,mongo*
+          mongodb_version: 8.0.x-enterprise
   - name: e2e-coverage-1
     tags:
       - required-for-publish
@@ -350,6 +373,7 @@ tasks:
           e2e_test_groups: 3
           e2e_test_group: 1
           debug: compass-e2e-tests*,electron*,hadron*,mongo*
+          mongodb_version: 8.0.x-enterprise
   - name: e2e-coverage-2
     tags:
       - required-for-publish
@@ -363,6 +387,7 @@ tasks:
           e2e_test_groups: 3
           e2e_test_group: 2
           debug: compass-e2e-tests*,electron*,hadron*,mongo*
+          mongodb_version: 8.0.x-enterprise
   - name: e2e-coverage-3
     tags:
       - required-for-publish
@@ -376,6 +401,7 @@ tasks:
           e2e_test_groups: 3
           e2e_test_group: 3
           debug: compass-e2e-tests*,electron*,hadron*,mongo*
+          mongodb_version: 8.0.x-enterprise
   - name: generate-vulnerability-report
     tags:
       - required-for-publish
@@ -401,16 +427,6 @@ tasks:
           scope: mongodb-compass
       - func: get-all-artifacts
       - func: publish
-  - name: publish-packages-next
-    tags: []
-    depends_on:
-      - name: .required-for-publish
-        variant: '*'
-    commands:
-      - func: prepare
-      - func: install
-      - func: bootstrap
-      - func: publish-packages-next
   - name: publish-dev-release-info
     tags: []
     depends_on:
@@ -488,7 +504,7 @@ tasks:
       - func: save-all-artifacts
         vars:
           compass_distribution: compass-readonly
-  - name: smoketest-compass
+  - name: smoketest-packaged-app
     tags:
       - required-for-publish
       - run-on-pr
@@ -497,11 +513,9 @@ tasks:
       - func: install
       - func: bootstrap
         vars:
-          scope: compass-e2e-tests
-      - func: smoketest-packaged-app
+          scope: '@mongodb-js/compass-smoke-tests'
+      - func: smoketest-on-github-actions
         vars:
-          mongodb_version: latest-enterprise
-          compass_distribution: compass
           debug: compass-e2e-tests*,electron*,hadron*,mongo*
   - name: test-server-40x-community-1
     tags:
@@ -1558,7 +1572,7 @@ tasks:
           compass_distribution: compass
       - func: test-packaged-app
         vars:
-          mongodb_version: latest-enterprise
+          mongodb_version: 8.0.x-enterprise
           compass_distribution: compass
           e2e_test_groups: 3
           e2e_test_group: 1
@@ -1583,7 +1597,7 @@ tasks:
           compass_distribution: compass
       - func: test-packaged-app
         vars:
-          mongodb_version: latest-enterprise
+          mongodb_version: 8.0.x-enterprise
           compass_distribution: compass
           e2e_test_groups: 3
           e2e_test_group: 2
@@ -1608,7 +1622,7 @@ tasks:
           compass_distribution: compass
       - func: test-packaged-app
         vars:
-          mongodb_version: latest-enterprise
+          mongodb_version: 8.0.x-enterprise
           compass_distribution: compass
           e2e_test_groups: 3
           e2e_test_group: 3
@@ -1630,7 +1644,7 @@ tasks:
           compass_distribution: compass
       - func: test-web-sandbox
         vars:
-          mongodb_version: latest-enterprise
+          mongodb_version: 8.0.x-enterprise
           browser_name: chrome
           compass_distribution: compass
           e2e_test_groups: 3
@@ -1653,7 +1667,7 @@ tasks:
           compass_distribution: compass
       - func: test-web-sandbox
         vars:
-          mongodb_version: latest-enterprise
+          mongodb_version: 8.0.x-enterprise
           browser_name: chrome
           compass_distribution: compass
           e2e_test_groups: 3
@@ -1676,7 +1690,7 @@ tasks:
           compass_distribution: compass
       - func: test-web-sandbox
         vars:
-          mongodb_version: latest-enterprise
+          mongodb_version: 8.0.x-enterprise
           browser_name: chrome
           compass_distribution: compass
           e2e_test_groups: 3
@@ -1699,7 +1713,7 @@ tasks:
           compass_distribution: compass
       - func: test-web-sandbox
         vars:
-          mongodb_version: latest-enterprise
+          mongodb_version: 8.0.x-enterprise
           browser_name: firefox
           compass_distribution: compass
           e2e_test_groups: 3
@@ -1722,7 +1736,7 @@ tasks:
           compass_distribution: compass
       - func: test-web-sandbox
         vars:
-          mongodb_version: latest-enterprise
+          mongodb_version: 8.0.x-enterprise
           browser_name: firefox
           compass_distribution: compass
           e2e_test_groups: 3
@@ -1745,7 +1759,7 @@ tasks:
           compass_distribution: compass
       - func: test-web-sandbox
         vars:
-          mongodb_version: latest-enterprise
+          mongodb_version: 8.0.x-enterprise
           browser_name: firefox
           compass_distribution: compass
           e2e_test_groups: 3
